@@ -6,6 +6,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.database.Cursor;
+import android.database.sqlite.SQLiteConstraintException;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.os.Bundle;
@@ -21,6 +22,7 @@ public class MainActivity extends AppCompatActivity {
     Button btnInit, btnInsert, btnSelect, btnUpdate, btnDelete;
     MyDBHelper myDBHelper; // 사용하기 위해 선언
     SQLiteDatabase sqlDB; // 4대쿼리 (인스턴스 생성안함)
+    String nameInput, numInput;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -35,6 +37,7 @@ public class MainActivity extends AppCompatActivity {
         edtNumber = findViewById(R.id.edtNumber);
         tvName = findViewById(R.id.tvName);
         tvNum = findViewById(R.id.tvNum);
+
         myDBHelper = new MyDBHelper(this); //인스턴스 만들자마자 생성자 호출-> db and table created
         btnInit.setOnClickListener(new View.OnClickListener() {//초기화 작업하기(실제로는 잘 안쓰지만 )
             @Override
@@ -43,88 +46,88 @@ public class MainActivity extends AppCompatActivity {
                 sqlDB = myDBHelper.getWritableDatabase(); // 읽어오고
                 myDBHelper.onUpgrade(sqlDB, 1, 2);//upgrade 메소드 수행
                 sqlDB.close();
-
             }
         });
 
         btnInsert.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String nameInput = edtName.getText().toString();
-                String numInput = edtNumber.getText().toString();
-                Cursor cursor;
-                sqlDB = myDBHelper.getReadableDatabase();// 불러오기
-                cursor = sqlDB.rawQuery("select gName from grouptbl where gName='" + nameInput + "'", null);
-                String nameCheck = null;
-                while (cursor.moveToNext()) {
-                    nameCheck = cursor.getString(0);
+                nameInput = edtName.getText().toString();
+                numInput = edtNumber.getText().toString();
+                sqlDB = myDBHelper.getWritableDatabase();
+                try {
+                    sqlDB.execSQL("INSERT INTO groupTBL VALUES ('"+nameInput+"',"+numInput+");");
+                    showToast("자료가 저장되었습니다.");;
+                }catch (SQLiteConstraintException e){
+                    if (nameInput.isEmpty() || numInput.isEmpty()){
+                        showToast("자료를 입력하세요.");
+                    }
+                    showToast("이미 등록된 그룹이라 재 등록이 되지 않습니다.");
                 }
-                cursor.close();
-                //그룹이름,인원 비워둔채 입력하면 토스트 메시지
-                if (nameInput.isEmpty() || numInput.isEmpty()) {
+/*                if (nameInput.isEmpty() || numInput.isEmpty()) {
                     showToast("자료를 입력하세요.");
-                } else if (nameCheck.equals(nameInput)) {//이미 등록된 그룹이면 메시지 보이기
-                    showToast("이미 등록된 그룹입니다. \n수정하거나 새로운 그룹을 입력하세요");
                 } else {
                     sqlDB = myDBHelper.getWritableDatabase();// 값 넣을 거니까..
                     //문자니까 홑따옴표! , 홑따옴표 없는 숫자는 바로 던져주면 숫자로 받음
-                    sqlDB.execSQL("insert into grouptbl values ('" + nameInput + "'," + numInput + ");");//insert, delete, update는 이 명령어 이용 select만 rawQuery 명령어 이용
-
+                    sqlDB.execSQL("insert into grouptbl values ('" + nameInput + "'," + numInput + ");");
+                    //insert, delete, update는 이 명령어 이용 select만 rawQuery 명령어 이용
                     sqlDB.close();
                     showToast("자료가 저장되었습니다.");
                     edtName.setText("");
                     edtNumber.setText(""); //입력하고 나면 없어지게
-                    tvName.setText(nameInput);
-                    tvNum.setText(numInput);
-                }
+                    btnSelect.callOnClick();
+                }*/
             }
         });
         //그룹이름을 입력하여 인원 업뎃
         btnUpdate.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String nameInput = edtName.getText().toString();
-                String numInput = edtNumber.getText().toString();
+                nameInput = edtName.getText().toString();
+                numInput = edtNumber.getText().toString();
                 sqlDB = myDBHelper.getWritableDatabase();
-                sqlDB.execSQL("update grouptbl set gNumber='" + numInput + "' where gName ='" + nameInput + "';");
-                sqlDB.close();
-                edtNumber.setText("");
-                tvName.setText(nameInput);
-                tvNum.setText(numInput);
+                if (nameInput.isEmpty() || numInput.isEmpty()) {
+                    showToast("수정할 그룹과 인원을 입력하세요.");
+                } else {                                                       //한칸 꼭 띄기.
+                    sqlDB.execSQL("update grouptbl set gNumber=" + numInput + " where gName ='" + nameInput + "';");
+                    sqlDB.close();
+                    showToast("수정되었습니다.");
+                    edtNumber.setText("");
+                    btnSelect.callOnClick(); //수정한게 뜨도록 메소드 호출
+                }
+
             }
         });
         //그룹이름을 입력하여 그룹 삭제
         btnDelete.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String nameInput = edtName.getText().toString();
+                nameInput = edtName.getText().toString();
                 sqlDB = myDBHelper.getWritableDatabase();
-                sqlDB.execSQL("delete from grouptbl where gName='" + nameInput + "';");
-                sqlDB.close();
+                if (nameInput.isEmpty() || numInput.isEmpty()) {
+                    showToast("삭제할 그룹과 인원을 입력하세요.");
+                } else {
+                    sqlDB.execSQL("delete from grouptbl where gName='" + nameInput + "';");
+                    sqlDB.close();
+                    edtNumber.setText("");
+                    btnSelect.callOnClick();
+                }
             }
         });
         btnSelect.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String nameInput = edtName.getText().toString();
+                nameInput = edtName.getText().toString();
                 sqlDB = myDBHelper.getReadableDatabase();//조회는 읽어오는 거니까
                 Cursor cursor;//인터페이스--> db를 원하는 위치에 오게 해준다. 조회하는 위치에 가져다준다.
+                cursor = sqlDB.rawQuery("select * from grouptbl  where gName like '" + nameInput + "%';", null);
                 String strNames = "그룹이름\n----------\n";
                 String strNumbers = "인원\n-----------\n";
-                if (!nameInput.isEmpty()) { // 일부만 입력하면 해당 레코드만 조회
-                    cursor = sqlDB.rawQuery("select * from grouptbl like '" + nameInput + "';", null);
-                    while(cursor.moveToNext()){
-                        strNames += cursor.getString(0) + "\n";
-                        strNumbers += cursor.getInt(1) + "\n";
-                    }
-                } else {//비어있으면 전체조회
-                    cursor = sqlDB.rawQuery("select * from grouptbl;", null);//select는 이 메소드
-                    //database에서 while많이 사용 -> 데이터베이스가 하나씩 접근 (레코드 개수를 모르니까) ,
-                    while (cursor.moveToNext()) { //끝에오면 다음으로 갈 수 없으니 빠져나오게 됨
-                        //누적
-                        strNames += cursor.getString(0) + "\n"; //가져온거에서 순서 붙음 우리는 모두 가져옴.
-                        strNumbers += cursor.getInt(1) + "\n";//real(실수)라면 getDouble
-                    }
+                //database에서 while많이 사용 -> 데이터베이스가 하나씩 접근 (레코드 개수를 모르니까) ,
+                while (cursor.moveToNext()) { //끝에오면 다음으로 갈 수 없으니 빠져나오게 됨
+                    //누적
+                    strNames += cursor.getString(0) + "\n"; //가져온거에서 순서 붙음 우리는 모두 가져옴.
+                    strNumbers += cursor.getInt(1) + "\n";//real(실수)라면 getDouble
                     tvName.setText(strNames);
                     tvNum.setText(strNumbers);
                     cursor.close();
